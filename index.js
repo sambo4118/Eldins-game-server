@@ -330,6 +330,21 @@ class Grid {
     }
 }
 
+class Score {
+    constructor() {
+        this.score = 0;
+        this.linesCleared = 0;
+        this.level = 1;
+    }
+
+    addscore(lines) {
+        const lineScores = [0, 1000, 2000, 3000, 10000];
+        this.score += lineScores[lines] * this.level;
+        this.linesCleared += lines;
+        this.level = Math.floor(this.linesCleared / 10) + 1;
+    }
+}
+
 function grabBagRandomShape(bag) {
     if (!bag || bag.length === 0) {
         const shapes = ["O", "I", "T", "L", "J", "S", "Z"];
@@ -441,13 +456,39 @@ document.addEventListener("keydown", (key) => {
     }
     
     if (key.key === "ArrowDown") {
-        if (currentPeice.checkCollision(currentPeice.x, currentPeice.y + 1)) return;
         if (!currentPeice.active) return;
-        currentPeice.clearCells();
-        currentPeice.y += 1;
-        currentPeice.resetLockDelay();
-        currentPeice.updateCells();
-        playField.drawCells();
+
+        const newRotation = (currentPeice.rotation - 1 + currentPeice.rotationNumber) % currentPeice.rotationNumber;
+        
+        const kickOffsets = [
+            [0, 0],
+            [-1, 0], 
+            [1, 0],
+            [2, 0],
+            [-2, 0],
+            [0, -1],
+            [-1, -1],
+            [1, -1],
+            [2, -1],
+            [0, -2],
+        ];
+
+        for (const [offsetX, offsetY] of kickOffsets) {
+            const testX = currentPeice.x + offsetX;
+            const testY = currentPeice.y + offsetY;
+            
+            if (!currentPeice.checkCollision(testX, testY, newRotation)) {
+
+                currentPeice.clearCells();
+                currentPeice.x = testX;
+                currentPeice.y = testY;
+                currentPeice.rotation = newRotation;
+                currentPeice.resetLockDelay();
+                currentPeice.updateCells();
+                playField.drawCells();
+                return;
+            }
+        }
     }
 
     if (key.key === "ArrowUp") {
