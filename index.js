@@ -15,8 +15,8 @@ class tetromino {
             this.loadTexture(texture);
         }
         this.active = true;
-        this.lockDelaySteps = 0;
-        this.maxLockDelaySteps = 3;
+        this.lockDelayStart = null;
+        this.lockDelayMs = 500;
         if (!this.color && !this.texture) {
             this.color = this.shapeColor();
         }
@@ -250,13 +250,14 @@ class tetromino {
         const canMove = !this.checkCollision(this.x, this.y + 1);
         
         if (!canMove) {
-            this.lockDelaySteps++;
-            if (this.lockDelaySteps >= this.maxLockDelaySteps) {
+            if (this.lockDelayStart === null) this.lockDelayStart = Date.now();
+            if (Date.now() - this.lockDelayStart >= this.lockDelayMs) {
                 this.active = false;
             }
             return;
         }
 
+        this.lockDelayStart = null;
         this.clearCells();
         this.y += 1;
         this.updateCells();
@@ -266,7 +267,7 @@ class tetromino {
     }
 
     resetLockDelay() {
-        this.lockDelaySteps = 0;
+        this.lockDelayStart = null;
     }
 
     hardDrop() {
@@ -397,7 +398,7 @@ class Score {
     }
 
     addscore(lines) {
-        const lineScores = [0, 1000, 2000, 3000, 10000];
+        const lineScores = [0, 100, 300, 500, 800];
         this.score += lineScores[lines] * this.level;
         this.linesCleared += lines;
         this.level = Math.floor(this.linesCleared / 10) + 1;
@@ -414,7 +415,7 @@ class Score {
         this.context.clearRect(this.x, this.y - 20, this.x + maxWidth, this.y + 48);
         this.context.fillStyle = this.color;
         this.context.font = this.font;
-        this.context.fillText(`Score: ${this.displayScore}`, this.x, this.y);
+        this.context.fillText(`${this.displayScore}`, this.x, this.y);
         this.context.fillText(`Lines: ${this.linesCleared}`, this.x, this.y + 24);
         this.context.fillText(`Level: ${this.level}`, this.x, this.y + 48);
     }
@@ -435,26 +436,66 @@ function grabBagRandomShape(bag) {
 }
 
 function holdPiece() {
-    if (!canHold || !currentPeice.active) return;
+    if (!canHold || !currentPiece.active) return;
     
-    currentPeice.clearCells();
-    const currentShape = currentPeice.shape;
+    currentPiece.clearCells();
+    const currentShape = currentPiece.shape;
     
     if (heldPieceShape === null) {
         heldPieceShape = currentShape;
-        const shape = grabBagRandomShape(bag);
-        currentPeice = new tetromino(shape, playField, null, startSpot, shape === "I" ? -1 : 0);
+        const shape = nextPieceShape;
+        nextPieceShape = grabBagRandomShape(bag);
+        drawNextPiece();
+        currentPiece = new tetromino(shape, playField, null, startSpot, shape === "I" ? -1 : 0);
     } else {
         const tempShape = heldPieceShape;
         heldPieceShape = currentShape;
-        currentPeice = new tetromino(tempShape, playField, null, startSpot, tempShape === "I" ? -1 : 0);
+        currentPiece = new tetromino(tempShape, playField, null, startSpot, tempShape === "I" ? -1 : 0);
     }
     
-    currentPeice.updateCells();
+    currentPiece.updateCells();
     canHold = false;
     drawHeldPiece();
     playField.drawCells();
-    playField.drawActivePiece(currentPeice);
+    playField.drawActivePiece(currentPiece);
+}
+
+function drawNextPiece() {
+    context.fillStyle = "black";
+    context.fillRect(nextGrid.left, nextGrid.top, nextGrid.width, nextGrid.height);
+    nextGrid.drawBorder("grey", 1);
+
+    if (nextPieceShape) {
+        const tempPiece = new tetromino(nextPieceShape, nextGrid, null, 0, 0);
+        const matrix = tempPiece.matrix(0);
+
+        let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+        matrix.forEach((row, i) => row.forEach((cell, j) => {
+            if (!cell) return;
+            if (i < minRow) minRow = i;
+            if (i > maxRow) maxRow = i;
+            if (j < minCol) minCol = j;
+            if (j > maxCol) maxCol = j;
+        }));
+
+        const filledCols = maxCol - minCol + 1;
+        const filledRows = maxRow - minRow + 1;
+        const startX = nextGrid.centerX - (filledCols * nextGrid.cellSize) / 2;
+        const startY = nextGrid.centerY - (filledRows * nextGrid.cellSize) / 2;
+
+        matrix.forEach((row, i) => {
+            row.forEach((cell, j) => {
+                if (!cell) return;
+                context.fillStyle = tempPiece.color;
+                context.fillRect(
+                    startX + (j - minCol) * nextGrid.cellSize,
+                    startY + (i - minRow) * nextGrid.cellSize,
+                    nextGrid.cellSize,
+                    nextGrid.cellSize
+                );
+            });
+        });
+    }
 }
 
 function drawHeldPiece() {
@@ -496,14 +537,16 @@ function drawHeldPiece() {
 }
 
 playField = new Grid(canvas.width / 2, canvas.height / 2 + 50, 20, 20, 10);
-scoreCounter = new Score(context, canvas.width - 100, playField.top);
+scoreCounter = new Score(context, playField.left - 100, playField.top + playField.height - 48);
 holdGrid = new Grid(canvas.width / 2 - 150, canvas.height / 2 - 100, 20, 4, 4);
+nextGrid = new Grid(canvas.width / 2 + 150, canvas.height / 2 - 100, 20, 4, 4);
 
 LastStepTime = Date.now();
 let bag = [];
 let heldPieceShape = null;
+let nextPieceShape = null;
 let canHold = true;
-let currentPeice = null;
+let currentPiece = null;
 
 let gameState = "menu";
 let menuSelection = 0;
@@ -511,24 +554,30 @@ const menuItems = ["Play", "Options"];
 let startLevel = 1;
 
 function startGame() {
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
     bag = [];
     heldPieceShape = null;
+    nextPieceShape = null;
     canHold = true;
     playField.cells = Array.from({ length: playField.rows }, () => Array(playField.cols).fill(null));
     scoreCounter.score = 0;
     scoreCounter.displayScore = 0;
     scoreCounter.linesCleared = (startLevel - 1) * 10;
     scoreCounter.level = startLevel;
+    nextPieceShape = grabBagRandomShape(bag);
     const initialShape = grabBagRandomShape(bag);
-    currentPeice = new tetromino(initialShape, playField, null, startSpot, initialShape === "I" ? -1 : 0);
-    currentPeice.updateCells();
+    currentPiece = new tetromino(initialShape, playField, null, startSpot, initialShape === "I" ? -1 : 0);
+    currentPiece.updateCells();
     LastStepTime = Date.now();
     gameState = "playing";
     playField.drawCells();
-    playField.drawActivePiece(currentPeice);
+    playField.drawActivePiece(currentPiece);
     playField.drawBorder("grey", 1);
     holdGrid.drawBorder("grey", 1);
+    nextGrid.drawBorder("grey", 1);
     drawHeldPiece();
+    drawNextPiece();
 }
 
 function drawMenu() {
@@ -591,6 +640,7 @@ function loop() {
     if (gameState === "menu") drawMenu();
     else if (gameState === "options") drawOptions();
     else if (gameState === "playing") gameLoop();
+    // "paused" and "gameover" states: do nothing, overlay already drawn
     requestAnimationFrame(loop);
 }
 
@@ -609,31 +659,36 @@ function gameOver() {
 }
 
 function gameLoop() {
-    console.log("loop");
-    if (Date.now() - LastStepTime > 500) {
-        if (!currentPeice.active) {
-            const shape = grabBagRandomShape(bag);
+    const L = scoreCounter.level;
+    const stepInterval = Math.pow(0.8 - (L - 1) * 0.007, L - 1) * 1000;
+    if (Date.now() - LastStepTime > stepInterval) {
+        if (!currentPiece.active) {
+            const shape = nextPieceShape;
+            nextPieceShape = grabBagRandomShape(bag);
+            drawNextPiece();
             const spawnY = shape === "I" ? -1 : 0;
-            currentPeice = new tetromino(shape, playField, null, startSpot, spawnY);
-            if (currentPeice.checkCollision()) {
+            currentPiece = new tetromino(shape, playField, null, startSpot, spawnY);
+            if (currentPiece.checkCollision()) {
                 gameOver();
                 return;
             }
-            currentPeice.updateCells();
+            currentPiece.updateCells();
             canHold = true;
             playField.drawCells();
-            playField.drawActivePiece(currentPeice);
+            playField.drawActivePiece(currentPiece);
         } else {
-            currentPeice.stepDown();
+            currentPiece.stepDown();
         }
 
         LastStepTime = Date.now();
     }
     
-    if (playField.checkLines().length > 0) {
-        playField.checkLines().forEach(row => { playField.clearLine(row); scoreCounter.addscore(1); });
+    const fullRows = playField.checkLines();
+    if (fullRows.length > 0) {
+        fullRows.forEach(row => playField.clearLine(row));
+        scoreCounter.addscore(fullRows.length);
         playField.drawCells();
-        playField.drawActivePiece(currentPeice);
+        playField.drawActivePiece(currentPiece);
     }
 
     scoreCounter.draw();
@@ -689,68 +744,92 @@ document.addEventListener("keydown", (key) => {
         return;
     }
 
+    if (gameState === "paused") {
+        if (key.key === "Escape") {
+            gameState = "playing";
+            LastStepTime = Date.now();
+            playField.drawCells();
+            playField.drawActivePiece(currentPiece);
+        }
+        return;
+    }
+
     if (gameState !== "playing") return;
 
+    if (key.key === "Escape") {
+        gameState = "paused";
+        context.fillStyle = "rgba(0, 0, 0, 0.6)";
+        context.fillRect(playField.left, playField.top, playField.width, playField.height);
+        context.fillStyle = "white";
+        context.font = "bold 28px Arial";
+        context.textAlign = "center";
+        context.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
+        context.font = "16px Arial";
+        context.fillText("Press Escape to resume", canvas.width / 2, canvas.height / 2 + 32);
+        context.textAlign = "left";
+        return;
+    }
+
     if (key.key === "ArrowLeft") {
-        if (currentPeice.checkCollision(currentPeice.x - 1)) return;
-        if (!currentPeice.active) return;
-        currentPeice.clearCells();
-        currentPeice.x -= 1;
-        currentPeice.resetLockDelay();
-        currentPeice.updateCells();
+        if (currentPiece.checkCollision(currentPiece.x - 1)) return;
+        if (!currentPiece.active) return;
+        currentPiece.clearCells();
+        currentPiece.x -= 1;
+        currentPiece.resetLockDelay();
+        currentPiece.updateCells();
         playField.drawCells();
-        playField.drawActivePiece(currentPeice);
+        playField.drawActivePiece(currentPiece);
     }
     
     if (key.key === "ArrowRight") {
-        if (currentPeice.checkCollision(currentPeice.x + 1)) return;
-        if (!currentPeice.active) return;
-        currentPeice.clearCells();
-        currentPeice.x += 1;
-        currentPeice.resetLockDelay();
-        currentPeice.updateCells();
+        if (currentPiece.checkCollision(currentPiece.x + 1)) return;
+        if (!currentPiece.active) return;
+        currentPiece.clearCells();
+        currentPiece.x += 1;
+        currentPiece.resetLockDelay();
+        currentPiece.updateCells();
         playField.drawCells();
-        playField.drawActivePiece(currentPeice);
+        playField.drawActivePiece(currentPiece);
     }
     
     if (key.key === "ArrowDown") {
-        if (currentPeice.checkCollision(currentPeice.x, currentPeice.y + 1)) return;
-        if (!currentPeice.active) return;
-        currentPeice.clearCells();
-        currentPeice.y += 1;
-        currentPeice.resetLockDelay();
-        currentPeice.updateCells();
+        if (currentPiece.checkCollision(currentPiece.x, currentPiece.y + 1)) return;
+        if (!currentPiece.active) return;
+        currentPiece.clearCells();
+        currentPiece.y += 1;
+        currentPiece.resetLockDelay();
+        currentPiece.updateCells();
         playField.drawCells();
-        playField.drawActivePiece(currentPeice);
+        playField.drawActivePiece(currentPiece);
     }
 
     if (key.key === "ArrowUp") {
-        if (!currentPeice.active) return;
+        if (!currentPiece.active) return;
 
-        const newRotation = (currentPeice.rotation + 1) % currentPeice.rotationNumber;
-        const kickOffsets = getSRSKicks(currentPeice.shape, currentPeice.rotation, newRotation);
+        const newRotation = (currentPiece.rotation + 1) % currentPiece.rotationNumber;
+        const kickOffsets = getSRSKicks(currentPiece.shape, currentPiece.rotation, newRotation);
         if (!kickOffsets) return;
 
         for (const [offsetX, offsetY] of kickOffsets) {
-            const testX = currentPeice.x + offsetX;
-            const testY = currentPeice.y + offsetY;
+            const testX = currentPiece.x + offsetX;
+            const testY = currentPiece.y + offsetY;
             
-            if (!currentPeice.checkCollision(testX, testY, newRotation)) {
-                currentPeice.clearCells();
-                currentPeice.x = testX;
-                currentPeice.y = testY;
-                currentPeice.rotation = newRotation;
-                currentPeice.resetLockDelay();
-                currentPeice.updateCells();
+            if (!currentPiece.checkCollision(testX, testY, newRotation)) {
+                currentPiece.clearCells();
+                currentPiece.x = testX;
+                currentPiece.y = testY;
+                currentPiece.rotation = newRotation;
+                currentPiece.resetLockDelay();
+                currentPiece.updateCells();
                 playField.drawCells();
-                playField.drawActivePiece(currentPeice);
+                playField.drawActivePiece(currentPiece);
                 return;
             }
         }
     }
 
     if (key.key === " ") {
-        currentPeice.hardDrop();
+        currentPiece.hardDrop();
     }
 
     if (key.key === "c" || key.key === "C") {
