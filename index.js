@@ -1,6 +1,6 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
-const startSpot = 3;
+const startSpot = 2;
 
 class tetromino {
     constructor(shape, grid, color, gridX, gridY, rotation = 0, texture = null) {
@@ -65,9 +65,9 @@ class tetromino {
                 [0, 0, 0],
             ],
             [
-                [1, 0, 0],
-                [1, 1, 0],
-                [1, 0, 0],
+                [0, 1, 0],
+                [0, 1, 1],
+                [0, 1, 0],
             ],
             [
                 [0, 0, 0],
@@ -75,9 +75,9 @@ class tetromino {
                 [0, 1, 0],
             ],
             [
-                [0, 0, 1],
-                [0, 1, 1],
-                [0, 0, 1],
+                [0, 1, 0],
+                [1, 1, 0],
+                [0, 1, 0],
             ],
         ],
         J: [
@@ -131,9 +131,9 @@ class tetromino {
                 [0, 0, 0],
             ],
             [
-                [1, 0, 0],
-                [1, 1, 0],
                 [0, 1, 0],
+                [0, 1, 1],
+                [0, 0, 1],
             ],
             [
                 [0, 0, 0],
@@ -141,9 +141,9 @@ class tetromino {
                 [1, 1, 0],
             ],
             [
+                [1, 0, 0],
+                [1, 1, 0],
                 [0, 1, 0],
-                [0, 1, 1],
-                [0, 0, 1],
             ],
         ],
         Z: [
@@ -204,18 +204,10 @@ class tetromino {
                 const gridX = this.x + j;
                 const gridY = this.y + i;
 
+                if (gridY < 0 || gridY >= this.grid.rows || gridX < 0 || gridX >= this.grid.cols) return;
                 if (this.grid.cells[gridY][gridX] != null && this.grid.cells[gridY][gridX] != this) return;
-                
-                if (
-                        gridY >= 0 &&
-                        gridY < this.grid.rows &&
-                        gridX >= 0 && 
-                        gridX < this.grid.cols
-                    ) {
-                    this.grid.cells[gridY][gridX] = this;
-                }
-                
 
+                this.grid.cells[gridY][gridX] = this;
             })
         });
         return true;
@@ -362,6 +354,9 @@ class Grid {
     }
 
     drawCells() {
+        const spawnRows = 4;
+        context.fillStyle = "black";
+        context.fillRect(this.left, this.top - spawnRows * this.cellSize, this.width, spawnRows * this.cellSize);
         this.drawBorder("grey", 1);
         this.cells.forEach((row, i) => {
             row.forEach((cell, j) => {
@@ -463,7 +458,6 @@ function holdPiece() {
 }
 
 function drawHeldPiece() {
-    // Clear and redraw the hold box background
     context.fillStyle = "black";
     context.fillRect(holdGrid.left, holdGrid.top, holdGrid.width, holdGrid.height);
     holdGrid.drawBorder("grey", 1);
@@ -471,18 +465,28 @@ function drawHeldPiece() {
     if (heldPieceShape) {
         const tempPiece = new tetromino(heldPieceShape, holdGrid, null, 0, 0);
         const matrix = tempPiece.matrix(0);
-        const pieceCols = matrix[0].length;
-        const pieceRows = matrix.length;
-        const startX = holdGrid.centerX - (pieceCols * holdGrid.cellSize) / 2;
-        const startY = holdGrid.centerY - (pieceRows * holdGrid.cellSize) / 2;
+
+        let minRow = Infinity, maxRow = -Infinity, minCol = Infinity, maxCol = -Infinity;
+        matrix.forEach((row, i) => row.forEach((cell, j) => {
+            if (!cell) return;
+            if (i < minRow) minRow = i;
+            if (i > maxRow) maxRow = i;
+            if (j < minCol) minCol = j;
+            if (j > maxCol) maxCol = j;
+        }));
+
+        const filledCols = maxCol - minCol + 1;
+        const filledRows = maxRow - minRow + 1;
+        const startX = holdGrid.centerX - (filledCols * holdGrid.cellSize) / 2;
+        const startY = holdGrid.centerY - (filledRows * holdGrid.cellSize) / 2;
 
         matrix.forEach((row, i) => {
             row.forEach((cell, j) => {
                 if (!cell) return;
                 context.fillStyle = tempPiece.color;
                 context.fillRect(
-                    startX + j * holdGrid.cellSize,
-                    startY + i * holdGrid.cellSize,
+                    startX + (j - minCol) * holdGrid.cellSize,
+                    startY + (i - minRow) * holdGrid.cellSize,
                     holdGrid.cellSize,
                     holdGrid.cellSize
                 );
@@ -492,36 +496,136 @@ function drawHeldPiece() {
 }
 
 playField = new Grid(canvas.width / 2, canvas.height / 2 + 50, 20, 20, 10);
-playField.drawBorder("grey", 1);
 scoreCounter = new Score(context, canvas.width - 100, playField.top);
-// Hold grid - small 4x4 grid on the left side
 holdGrid = new Grid(canvas.width / 2 - 150, canvas.height / 2 - 100, 20, 4, 4);
-holdGrid.drawBorder("grey", 1);
 
 LastStepTime = Date.now();
 let bag = [];
 let heldPieceShape = null;
 let canHold = true;
+let currentPeice = null;
 
-const initialShape = grabBagRandomShape(bag);
-let currentPeice = new tetromino(initialShape, playField, null, startSpot, initialShape === "I" ? -1 : 0);
-currentPeice.updateCells();
+let gameState = "menu";
+let menuSelection = 0;
+const menuItems = ["Play", "Options"];
+let startLevel = 1;
 
-drawHeldPiece();
+function startGame() {
+    bag = [];
+    heldPieceShape = null;
+    canHold = true;
+    playField.cells = Array.from({ length: playField.rows }, () => Array(playField.cols).fill(null));
+    scoreCounter.score = 0;
+    scoreCounter.displayScore = 0;
+    scoreCounter.linesCleared = (startLevel - 1) * 10;
+    scoreCounter.level = startLevel;
+    const initialShape = grabBagRandomShape(bag);
+    currentPeice = new tetromino(initialShape, playField, null, startSpot, initialShape === "I" ? -1 : 0);
+    currentPeice.updateCells();
+    LastStepTime = Date.now();
+    gameState = "playing";
+    playField.drawCells();
+    playField.drawActivePiece(currentPeice);
+    playField.drawBorder("grey", 1);
+    holdGrid.drawBorder("grey", 1);
+    drawHeldPiece();
+}
 
-requestAnimationFrame(gameLoop);
+function drawMenu() {
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.textAlign = "center";
+
+    context.font = "bold 48px Arial";
+    context.fillStyle = "cyan";
+    context.fillText("TETRIS", canvas.width / 2, canvas.height / 2 - 80);
+
+    menuItems.forEach((item, i) => {
+        const y = canvas.height / 2 - 10 + i * 44;
+        const selected = i === menuSelection;
+        context.font = selected ? "bold 24px Arial" : "22px Arial";
+        context.fillStyle = selected ? "white" : "#888";
+        if (selected) {
+            context.fillText("> " + item + " <", canvas.width / 2, y);
+        } else {
+            context.fillText(item, canvas.width / 2, y);
+        }
+    });
+
+    context.font = "13px Arial";
+    context.fillStyle = "#555";
+    context.fillText("Up / Down to select   Enter to confirm", canvas.width / 2, canvas.height / 2 + 130);
+
+    context.textAlign = "left";
+}
+
+function drawOptions() {
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.textAlign = "center";
+
+    context.font = "bold 32px Arial";
+    context.fillStyle = "cyan";
+    context.fillText("OPTIONS", canvas.width / 2, canvas.height / 2 - 100);
+
+    context.font = "20px Arial";
+    context.fillStyle = "white";
+    context.fillText("Start Level", canvas.width / 2, canvas.height / 2 - 20);
+
+    context.font = "bold 28px Arial";
+    context.fillStyle = "yellow";
+    context.fillText("< " + startLevel + " >", canvas.width / 2, canvas.height / 2 + 20);
+
+    context.font = "13px Arial";
+    context.fillStyle = "#555";
+    context.fillText("Left / Right to change   Escape to go back", canvas.width / 2, canvas.height / 2 + 80);
+
+    context.textAlign = "left";
+}
+
+requestAnimationFrame(loop);
+
+function loop() {
+    if (gameState === "menu") drawMenu();
+    else if (gameState === "options") drawOptions();
+    else if (gameState === "playing") gameLoop();
+    requestAnimationFrame(loop);
+}
+
+function gameOver() {
+    playField.drawCells();
+    context.fillStyle = "rgba(0, 0, 0, 0.6)";
+    context.fillRect(playField.left, playField.top, playField.width, playField.height);
+    context.fillStyle = "white";
+    context.font = "bold 28px Arial";
+    context.textAlign = "center";
+    context.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    context.font = "16px Arial";
+    context.fillText("Press Enter to play again", canvas.width / 2, canvas.height / 2 + 32);
+    context.textAlign = "left";
+    gameState = "gameover";
+}
 
 function gameLoop() {
     console.log("loop");
     if (Date.now() - LastStepTime > 500) {
         if (!currentPeice.active) {
             const shape = grabBagRandomShape(bag);
-            currentPeice = new tetromino(shape, playField, null, startSpot, shape === "I" ? -1 : 0);
+            const spawnY = shape === "I" ? -1 : 0;
+            currentPeice = new tetromino(shape, playField, null, startSpot, spawnY);
+            if (currentPeice.checkCollision()) {
+                gameOver();
+                return;
+            }
             currentPeice.updateCells();
-            canHold = true; // Reset hold ability for new piece
+            canHold = true;
+            playField.drawCells();
+            playField.drawActivePiece(currentPeice);
+        } else {
+            currentPeice.stepDown();
         }
-        
-        currentPeice.stepDown();
 
         LastStepTime = Date.now();
     }
@@ -533,8 +637,6 @@ function gameLoop() {
     }
 
     scoreCounter.draw();
-
-    requestAnimationFrame(gameLoop);
 }
 
 function getSRSKicks(shape, fromRotation, toRotation) {
@@ -563,6 +665,32 @@ function getSRSKicks(shape, fromRotation, toRotation) {
 }
 
 document.addEventListener("keydown", (key) => {
+    if (gameState === "menu") {
+        if (key.key === "ArrowUp") {
+            menuSelection = (menuSelection - 1 + menuItems.length) % menuItems.length;
+        } else if (key.key === "ArrowDown") {
+            menuSelection = (menuSelection + 1) % menuItems.length;
+        } else if (key.key === "Enter") {
+            if (menuSelection === 0) startGame();
+            else if (menuSelection === 1) gameState = "options";
+        }
+        return;
+    }
+
+    if (gameState === "options") {
+        if (key.key === "Escape") gameState = "menu";
+        if (key.key === "ArrowLeft") startLevel = Math.max(1, startLevel - 1);
+        if (key.key === "ArrowRight") startLevel = Math.min(15, startLevel + 1);
+        return;
+    }
+
+    if (gameState === "gameover") {
+        if (key.key === "Enter") startGame();
+        return;
+    }
+
+    if (gameState !== "playing") return;
+
     if (key.key === "ArrowLeft") {
         if (currentPeice.checkCollision(currentPeice.x - 1)) return;
         if (!currentPeice.active) return;
@@ -586,28 +714,14 @@ document.addEventListener("keydown", (key) => {
     }
     
     if (key.key === "ArrowDown") {
+        if (currentPeice.checkCollision(currentPeice.x, currentPeice.y + 1)) return;
         if (!currentPeice.active) return;
-
-        const newRotation = (currentPeice.rotation - 1 + currentPeice.rotationNumber) % currentPeice.rotationNumber;
-        const kickOffsets = getSRSKicks(currentPeice.shape, currentPeice.rotation, newRotation);
-        if (!kickOffsets) return;
-
-        for (const [offsetX, offsetY] of kickOffsets) {
-            const testX = currentPeice.x + offsetX;
-            const testY = currentPeice.y + offsetY;
-            
-            if (!currentPeice.checkCollision(testX, testY, newRotation)) {
-                currentPeice.clearCells();
-                currentPeice.x = testX;
-                currentPeice.y = testY;
-                currentPeice.rotation = newRotation;
-                currentPeice.resetLockDelay();
-                currentPeice.updateCells();
-                playField.drawCells();
-                playField.drawActivePiece(currentPeice);
-                return;
-            }
-        }
+        currentPeice.clearCells();
+        currentPeice.y += 1;
+        currentPeice.resetLockDelay();
+        currentPeice.updateCells();
+        playField.drawCells();
+        playField.drawActivePiece(currentPeice);
     }
 
     if (key.key === "ArrowUp") {
