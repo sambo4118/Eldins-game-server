@@ -1,6 +1,9 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
-const startSpot = 2;
+function getSpawnX(shape) {
+    const matrixWidth = shape === "I" ? 4 : (shape === "O" ? 2 : 3);
+    return Math.floor((playField.cols - matrixWidth) / 2);
+}
 
 class tetromino {
     constructor(shape, grid, color, gridX, gridY, rotation = 0, texture = null) {
@@ -427,12 +430,15 @@ class Score {
 function grabBagRandomShape(bag) {
     if (!bag || bag.length === 0) {
         const shapes = ["O", "I", "T", "L", "J", "S", "Z"];
-        bag.push(...shapes, ...shapes);
+        const shuffled = [...shapes];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        bag.push(...shuffled);
     }
 
-    const randomIndex = Math.floor(Math.random() * bag.length);
-    
-    return bag.splice(randomIndex, 1)[0];
+    return bag.shift();
 }
 
 function holdPiece() {
@@ -446,11 +452,11 @@ function holdPiece() {
         const shape = nextPieceShape;
         nextPieceShape = grabBagRandomShape(bag);
         drawNextPiece();
-        currentPiece = new tetromino(shape, playField, null, startSpot, shape === "I" ? -1 : 0);
+        currentPiece = new tetromino(shape, playField, null, getSpawnX(shape), shape === "I" ? -1 : 0);
     } else {
         const tempShape = heldPieceShape;
         heldPieceShape = currentShape;
-        currentPiece = new tetromino(tempShape, playField, null, startSpot, tempShape === "I" ? -1 : 0);
+        currentPiece = new tetromino(tempShape, playField, null, getSpawnX(tempShape), tempShape === "I" ? -1 : 0);
     }
     
     currentPiece.updateCells();
@@ -537,7 +543,7 @@ function drawHeldPiece() {
 }
 
 playField = new Grid(canvas.width / 2, canvas.height / 2 + 50, 20, 20, 10);
-scoreCounter = new Score(context, playField.left - 100, playField.top + playField.height - 48);
+scoreCounter = new Score(context, 10, playField.top + playField.height - 48);
 holdGrid = new Grid(canvas.width / 2 - 150, canvas.height / 2 - 100, 20, 4, 4);
 nextGrid = new Grid(canvas.width / 2 + 150, canvas.height / 2 - 100, 20, 4, 4);
 
@@ -567,7 +573,7 @@ function startGame() {
     scoreCounter.level = startLevel;
     nextPieceShape = grabBagRandomShape(bag);
     const initialShape = grabBagRandomShape(bag);
-    currentPiece = new tetromino(initialShape, playField, null, startSpot, initialShape === "I" ? -1 : 0);
+    currentPiece = new tetromino(initialShape, playField, null, getSpawnX(initialShape), initialShape === "I" ? -1 : 0);
     currentPiece.updateCells();
     LastStepTime = Date.now();
     gameState = "playing";
@@ -663,15 +669,23 @@ function gameLoop() {
     const stepInterval = Math.pow(0.8 - (L - 1) * 0.007, L - 1) * 1000;
     if (Date.now() - LastStepTime > stepInterval) {
         if (!currentPiece.active) {
+            const fullRows = playField.checkLines();
+            if (fullRows.length > 0) {
+                fullRows.forEach(row => playField.clearLine(row));
+                scoreCounter.addscore(fullRows.length);
+            }
+
             const shape = nextPieceShape;
             nextPieceShape = grabBagRandomShape(bag);
             drawNextPiece();
             const spawnY = shape === "I" ? -1 : 0;
-            currentPiece = new tetromino(shape, playField, null, startSpot, spawnY);
+            currentPiece = new tetromino(shape, playField, null, getSpawnX(shape), spawnY);
             if (currentPiece.checkCollision()) {
                 gameOver();
                 return;
             }
+            // updateCells must happen AFTER line clears so the new piece
+            // cells are not shifted down by the splice/unshift operations
             currentPiece.updateCells();
             canHold = true;
             playField.drawCells();
@@ -681,14 +695,6 @@ function gameLoop() {
         }
 
         LastStepTime = Date.now();
-    }
-    
-    const fullRows = playField.checkLines();
-    if (fullRows.length > 0) {
-        fullRows.forEach(row => playField.clearLine(row));
-        scoreCounter.addscore(fullRows.length);
-        playField.drawCells();
-        playField.drawActivePiece(currentPiece);
     }
 
     scoreCounter.draw();
@@ -830,6 +836,7 @@ document.addEventListener("keydown", (key) => {
 
     if (key.key === " ") {
         currentPiece.hardDrop();
+            LastStepTime = 0;
     }
 
     if (key.key === "c" || key.key === "C") {
