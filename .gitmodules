@@ -1,0 +1,3 @@
+[submodule "games/tetris-online"]
+	path = games/tetris-online
+	url = https://github.com/sambo4118/tetris-online.git
