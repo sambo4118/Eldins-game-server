@@ -1,3 +1,6 @@
 [submodule "games/tetris-online"]
 	path = games/tetris-online
 	url = https://github.com/sambo4118/tetris-online.git
+[submodule "games/2048-remade"]
+	path = games/2048-remade
+	url = https://github.com/sambo4118/2048-remade.git
