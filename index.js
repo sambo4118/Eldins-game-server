@@ -1,13 +1,14 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
 
+context.imageSmoothingEnabled = false;
+
 let baseWidth = 480;
 let baseHeight = 640;
 let scale = 1;
 
 function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
     
     const availWidth = window.innerWidth - 40;
     const availHeight = window.innerHeight - 40;
@@ -25,6 +26,7 @@ function resizeCanvas() {
     canvas.width = scaledWidth * dpr;
     canvas.height = scaledHeight * dpr;
     
+    context.setTransform(1, 0, 0, 1, 0, 0);
     context.scale(dpr, dpr);
     
     updateGameLayout();
@@ -437,15 +439,17 @@ class Grid {
                 context.rect(this.left, this.top, this.width, this.height);
                 context.clip();
                 context.globalAlpha = 0.25;
+                context.fillStyle = piece.color;
+                context.beginPath();
                 matrix.forEach((row, i) => {
                     row.forEach((cell, j) => {
                         if (!cell) return;
-                        const px = this.left + (piece.x + j) * this.cellSize;
-                        const py = this.top + (ghostY + i) * this.cellSize;
-                        context.fillStyle = piece.color;
-                        context.fillRect(px, py, this.cellSize, this.cellSize);
+                        const px = Math.floor(this.left + (piece.x + j) * this.cellSize);
+                        const py = Math.floor(this.top + (ghostY + i) * this.cellSize);
+                        context.rect(px, py, Math.ceil(this.cellSize), Math.ceil(this.cellSize));
                     });
                 });
+                context.fill();
                 context.restore();
             }
         }
@@ -457,10 +461,10 @@ class Grid {
         matrix.forEach((row, i) => {
             row.forEach((cell, j) => {
                 if (!cell) return;
-                const px = this.left + (piece.x + j) * this.cellSize;
-                const py = this.top + (piece.y + i) * this.cellSize;
+                const px = Math.floor(this.left + (piece.x + j) * this.cellSize);
+                const py = Math.floor(this.top + (piece.y + i) * this.cellSize);
                 context.fillStyle = piece.color;
-                context.fillRect(px, py, this.cellSize, this.cellSize);
+                context.fillRect(px, py, Math.ceil(this.cellSize), Math.ceil(this.cellSize));
             });
         });
         context.restore();
@@ -469,30 +473,34 @@ class Grid {
     drawCells() {
         const spawnRows = 4;
         context.fillStyle = "black";
-        context.fillRect(this.left, this.top - spawnRows * this.cellSize, this.width, spawnRows * this.cellSize);
-        this.drawBorder("grey", 1);
+        context.fillRect(
+            Math.floor(this.left), 
+            Math.floor(this.top - spawnRows * this.cellSize), 
+            Math.ceil(this.width), 
+            Math.ceil(spawnRows * this.cellSize)
+        );
+        context.fillRect(
+            Math.floor(this.left), 
+            Math.floor(this.top), 
+            Math.ceil(this.width), 
+            Math.ceil(this.height)
+        );
+        
         this.cells.forEach((row, i) => {
             row.forEach((cell, j) => {
                 if (cell) {
                     context.fillStyle = cell.color;
                     context.fillRect(
-                        this.left + j * this.cellSize,
-                        this.top + i * this.cellSize,
-                        this.cellSize,
-                        this.cellSize
-                    );
-                }
-                if (!cell) {
-                    context.fillStyle = "black";
-                    context.fillRect(
-                        this.left + j * this.cellSize,
-                        this.top + i * this.cellSize,
-                        this.cellSize,
-                        this.cellSize
+                        Math.floor(this.left + j * this.cellSize),
+                        Math.floor(this.top + i * this.cellSize),
+                        Math.ceil(this.cellSize),
+                        Math.ceil(this.cellSize)
                     );
                 }
             });
         });
+        
+        this.drawBorder("grey", 1);
     }
 }
 
@@ -544,14 +552,19 @@ class Score {
         }
         const comboText = this.combo > 0 ? `Combo x${this.combo}` : "";
         const b2bText = this.b2b ? "B2B" : "";
-        const scoreMetrics = this.context.measureText(`Score: ${this.displayScore}`);
+        
+        this.context.font = this.font;
+        const scoreMetrics = this.context.measureText(`${this.displayScore}`);
         const linesMetrics = this.context.measureText(`Lines: ${this.linesCleared}`);
         const levelMetrics = this.context.measureText(`Level: ${this.level}`);
         const comboMetrics = this.context.measureText(comboText);
         const b2bMetrics = this.context.measureText(b2bText);
         const maxWidth = Math.max(scoreMetrics.width, linesMetrics.width, levelMetrics.width, comboMetrics.width, b2bMetrics.width);
         const lineHeight = 24;
-        this.context.clearRect(this.x, this.y - 20, this.x + maxWidth, this.y + 96);
+        
+        this.context.fillStyle = "black";
+        this.context.fillRect(this.x - 2, this.y - 20, maxWidth + 4, 120);
+        
         this.context.fillStyle = this.color;
         this.context.font = this.font;
         this.context.fillText(`${this.displayScore}`, this.x, this.y);
@@ -644,10 +657,10 @@ function drawNextPiece() {
                 if (!cell) return;
                 context.fillStyle = tempPiece.color;
                 context.fillRect(
-                    startX + (j - minCol) * nextGrid.cellSize,
-                    startY + (i - minRow) * nextGrid.cellSize,
-                    nextGrid.cellSize,
-                    nextGrid.cellSize
+                    Math.floor(startX + (j - minCol) * nextGrid.cellSize),
+                    Math.floor(startY + (i - minRow) * nextGrid.cellSize),
+                    Math.ceil(nextGrid.cellSize),
+                    Math.ceil(nextGrid.cellSize)
                 );
             });
         });
@@ -682,10 +695,10 @@ function drawHeldPiece() {
                 if (!cell) return;
                 context.fillStyle = tempPiece.color;
                 context.fillRect(
-                    startX + (j - minCol) * holdGrid.cellSize,
-                    startY + (i - minRow) * holdGrid.cellSize,
-                    holdGrid.cellSize,
-                    holdGrid.cellSize
+                    Math.floor(startX + (j - minCol) * holdGrid.cellSize),
+                    Math.floor(startY + (i - minRow) * holdGrid.cellSize),
+                    Math.ceil(holdGrid.cellSize),
+                    Math.ceil(holdGrid.cellSize)
                 );
             });
         });
