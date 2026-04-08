@@ -6,16 +6,7 @@
         <title>Eldin's Game Server</title>
         <style>
             :root {
-                --bg-top: #f8e7bf;
-                --bg-bottom: #c1d4a6;
-                --ink: #2f2416;
-                --surface: #fff8ea;
-                --surface-border: #7f6d4f;
-
-                /* Replace this with url("/textures/your-texture.png") when ready. */
-                --link-texture: radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.3) 0%, transparent 40%),
-                    repeating-linear-gradient(45deg, rgba(122, 92, 52, 0.18) 0 8px, rgba(84, 60, 34, 0.18) 8px 16px);
-                --link-base: linear-gradient(140deg, #d7b47d, #b58a57);
+                color-scheme: dark;
             }
 
             * {
@@ -25,9 +16,9 @@
             body {
                 margin: 0;
                 min-height: 100vh;
-                font-family: Georgia, "Times New Roman", serif;
-                color: var(--ink);
-                background: linear-gradient(170deg, var(--bg-top), var(--bg-bottom));
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                color: #e8e8e8;
+                background: radial-gradient(circle at 20% 20%, #2a2f3a 0%, #171a21 45%, #0e1015 100%);
                 display: grid;
                 place-items: center;
                 padding: 2rem 1rem;
@@ -35,22 +26,24 @@
 
             main {
                 width: min(900px, 100%);
-                background: color-mix(in srgb, var(--surface) 90%, white 10%);
-                border: 2px solid var(--surface-border);
+                background: #1f2530;
+                border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 20px;
-                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
                 padding: clamp(1.5rem, 3vw, 2.5rem);
             }
 
             h1 {
                 margin: 0 0 0.5rem;
                 font-size: clamp(1.9rem, 3.4vw, 2.8rem);
+                color: #ffffff;
             }
 
             p {
                 margin: 0 0 1.5rem;
                 max-width: 58ch;
                 line-height: 1.5;
+                color: #b8c0cc;
             }
 
             .game-links {
@@ -67,11 +60,11 @@
                 display: block;
                 aspect-ratio: 1 / 1;
                 text-decoration: none;
-                color: #fdf7ec;
+                color: #e8e8e8;
                 border-radius: 14px;
                 overflow: hidden;
-                border: 1px solid rgba(30, 20, 8, 0.45);
-                box-shadow: 0 10px 18px rgba(0, 0, 0, 0.15);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
                 transition: transform 160ms ease, box-shadow 160ms ease;
                 isolation: isolate;
             }
@@ -85,25 +78,23 @@
             }
 
             .game-link::before {
-                background: var(--tile-image, var(--link-base));
+                background: var(--tile-image);
                 background-position: center;
                 background-size: cover;
             }
 
             .game-link::after {
-                background: var(--link-texture);
-                opacity: 0.8;
-                mix-blend-mode: multiply;
+                background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 50%);
             }
 
             .game-link:hover,
             .game-link:focus-visible {
                 transform: translateY(-3px);
-                box-shadow: 0 14px 24px rgba(0, 0, 0, 0.24);
+                box-shadow: 0 14px 28px rgba(0, 0, 0, 0.5);
             }
 
             .game-link:focus-visible {
-                outline: 3px solid #3f76b2;
+                outline: 3px solid #5a8ec9;
                 outline-offset: 2px;
             }
 
@@ -115,7 +106,7 @@
                 flex-direction: column;
                 justify-content: flex-end;
                 padding: 1rem;
-                background: linear-gradient(to top, rgba(24, 16, 10, 0.78), rgba(24, 16, 10, 0.18) 50%, transparent 72%);
+                background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.2) 50%, transparent 72%);
             }
 
             .game-title {
@@ -124,16 +115,17 @@
                 font-weight: 700;
                 letter-spacing: 0.02em;
                 margin-bottom: 0.2rem;
+                color: #ffffff;
             }
 
             .game-path {
-                opacity: 0.92;
+                opacity: 0.85;
                 font-size: 0.9rem;
+                color: #b8c0cc;
             }
 
             .tile-tetris {
-                /* Replace with: --tile-image: url("/textures/tetris.png"); */
-                --tile-image: linear-gradient(150deg, #566f9f 0%, #314a6f 45%, #2d2d3d 100%);
+                --tile-image: linear-gradient(150deg, #566f9f 0%, #314a6f 45%, #1f2530 100%);
             }
 
             .tile-2048 {
@@ -162,17 +154,15 @@
     </head>
     <body>
         <main>
-            <h1>Eldin's Game Server</h1>
+            <h1>Eldin's Games</h1>
             <p>
-                Add as many game tiles as you want. For each one, set a tile class with its own <strong>--tile-image</strong>.
+                You got games on your phone?
             </p>
-
             <ul class="game-links">
                 <li>
                     <a class="game-link tile-tetris" href="/tetris-online">
                         <span class="game-link-content">
                             <span class="game-title">Tetris Online</span>
-                            <span class="game-path">/tetris-online</span>
                         </span>
                     </a>
                 </li>
@@ -180,7 +170,6 @@
                     <a class="game-link tile-2048" href="/2048-remade">
                         <span class="game-link-content">
                             <span class="game-title">2048 Remade</span>
-                            <span class="game-path">/2048-remade</span>
                         </span>
                     </a>
                 </li>

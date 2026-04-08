@@ -1,6 +1,9 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const PORT = 8000;
+const ROOT = __dirname;
 
 const app = express();
 const PORT = 3000;
@@ -119,6 +122,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`Main site: http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
