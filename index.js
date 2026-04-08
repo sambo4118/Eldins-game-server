@@ -1,93 +1,7 @@
 const canvas = document.getElementById("gameCanvas");
 const context = canvas.getContext("2d");
-
-context.imageSmoothingEnabled = false;
-
-let baseWidth = 480;
-let baseHeight = 640;
-let scale = 1;
-
-function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
-    
-    const availWidth = window.innerWidth - 40;
-    const availHeight = window.innerHeight - 40;
-    
-    const scaleX = availWidth / baseWidth;
-    const scaleY = availHeight / baseHeight;
-    scale = Math.min(scaleX, scaleY, 2);
-    
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    
-    canvas.style.width = scaledWidth + 'px';
-    canvas.style.height = scaledHeight + 'px';
-    
-    canvas.width = scaledWidth * dpr;
-    canvas.height = scaledHeight * dpr;
-    
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.scale(dpr, dpr);
-    
-    updateGameLayout();
-    
-    if (gameState === "menu") drawMenu();
-    else if (gameState === "options") drawOptions();
-    else if (gameState === "playing" || gameState === "paused" || gameState === "gameover") {
-        playField.drawCells();
-        if (currentPiece) playField.drawActivePiece(currentPiece);
-        playField.drawBorder("grey", 1);
-        holdGrid.drawBorder("grey", 1);
-        nextGrid.drawBorder("grey", 1);
-        drawHeldPiece();
-        drawNextPiece();
-        scoreCounter.draw();
-        
-        if (gameState === "paused") {
-            context.fillStyle = "rgba(0, 0, 0, 0.6)";
-            context.fillRect(playField.left, playField.top, playField.width, playField.height);
-            context.fillStyle = "white";
-            context.font = "bold 28px Arial";
-            context.textAlign = "center";
-            context.fillText("PAUSED", scaledWidth / 2, scaledHeight / 2);
-            context.font = "16px Arial";
-            context.fillText("Press Escape to resume", scaledWidth / 2, scaledHeight / 2 + 32);
-            context.textAlign = "left";
-        } else if (gameState === "gameover") {
-            context.fillStyle = "rgba(0, 0, 0, 0.6)";
-            context.fillRect(playField.left, playField.top, playField.width, playField.height);
-            context.fillStyle = "white";
-            context.font = "bold 28px Arial";
-            context.textAlign = "center";
-            context.fillText("GAME OVER", scaledWidth / 2, scaledHeight / 2);
-            context.font = "16px Arial";
-            context.fillText("Press Enter to play again", scaledWidth / 2, scaledHeight / 2 + 32);
-            context.textAlign = "left";
-        }
-    }
-}
-
-function updateGameLayout() {
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    const cellSize = 20 * scale;
-    
-    playField.centerX = scaledWidth / 2;
-    playField.centerY = scaledHeight / 2 + 50 * scale;
-    playField.cellSize = cellSize;
-    
-    holdGrid.centerX = scaledWidth / 2 - 150 * scale;
-    holdGrid.centerY = scaledHeight / 2 - 100 * scale;
-    holdGrid.cellSize = cellSize;
-    
-    nextGrid.centerX = scaledWidth / 2 + 150 * scale;
-    nextGrid.centerY = scaledHeight / 2 - 100 * scale;
-    nextGrid.cellSize = cellSize;
-    
-    scoreCounter.x = 10 * scale;
-    scoreCounter.y = playField.top + playField.height - 48 * scale;
-    scoreCounter.font = "16px Arial";
-}
+const GAME_ID = "tetris-online";
+const LEADERBOARD_ENDPOINT = `/api/games/${GAME_ID}/leaderboard`;
 
 function getSpawnX(shape) {
     const matrixWidth = shape === "I" ? 4 : (shape === "O" ? 2 : 3);
@@ -439,17 +353,15 @@ class Grid {
                 context.rect(this.left, this.top, this.width, this.height);
                 context.clip();
                 context.globalAlpha = 0.25;
-                context.fillStyle = piece.color;
-                context.beginPath();
                 matrix.forEach((row, i) => {
                     row.forEach((cell, j) => {
                         if (!cell) return;
-                        const px = Math.floor(this.left + (piece.x + j) * this.cellSize);
-                        const py = Math.floor(this.top + (ghostY + i) * this.cellSize);
-                        context.rect(px, py, Math.ceil(this.cellSize), Math.ceil(this.cellSize));
+                        const px = this.left + (piece.x + j) * this.cellSize;
+                        const py = this.top + (ghostY + i) * this.cellSize;
+                        context.fillStyle = piece.color;
+                        context.fillRect(px, py, this.cellSize, this.cellSize);
                     });
                 });
-                context.fill();
                 context.restore();
             }
         }
@@ -461,10 +373,10 @@ class Grid {
         matrix.forEach((row, i) => {
             row.forEach((cell, j) => {
                 if (!cell) return;
-                const px = Math.floor(this.left + (piece.x + j) * this.cellSize);
-                const py = Math.floor(this.top + (piece.y + i) * this.cellSize);
+                const px = this.left + (piece.x + j) * this.cellSize;
+                const py = this.top + (piece.y + i) * this.cellSize;
                 context.fillStyle = piece.color;
-                context.fillRect(px, py, Math.ceil(this.cellSize), Math.ceil(this.cellSize));
+                context.fillRect(px, py, this.cellSize, this.cellSize);
             });
         });
         context.restore();
@@ -473,34 +385,30 @@ class Grid {
     drawCells() {
         const spawnRows = 4;
         context.fillStyle = "black";
-        context.fillRect(
-            Math.floor(this.left), 
-            Math.floor(this.top - spawnRows * this.cellSize), 
-            Math.ceil(this.width), 
-            Math.ceil(spawnRows * this.cellSize)
-        );
-        context.fillRect(
-            Math.floor(this.left), 
-            Math.floor(this.top), 
-            Math.ceil(this.width), 
-            Math.ceil(this.height)
-        );
-        
+        context.fillRect(this.left, this.top - spawnRows * this.cellSize, this.width, spawnRows * this.cellSize);
+        this.drawBorder("grey", 1);
         this.cells.forEach((row, i) => {
             row.forEach((cell, j) => {
                 if (cell) {
                     context.fillStyle = cell.color;
                     context.fillRect(
-                        Math.floor(this.left + j * this.cellSize),
-                        Math.floor(this.top + i * this.cellSize),
-                        Math.ceil(this.cellSize),
-                        Math.ceil(this.cellSize)
+                        this.left + j * this.cellSize,
+                        this.top + i * this.cellSize,
+                        this.cellSize,
+                        this.cellSize
+                    );
+                }
+                if (!cell) {
+                    context.fillStyle = "black";
+                    context.fillRect(
+                        this.left + j * this.cellSize,
+                        this.top + i * this.cellSize,
+                        this.cellSize,
+                        this.cellSize
                     );
                 }
             });
         });
-        
-        this.drawBorder("grey", 1);
     }
 }
 
@@ -552,33 +460,29 @@ class Score {
         }
         const comboText = this.combo > 0 ? `Combo x${this.combo}` : "";
         const b2bText = this.b2b ? "B2B" : "";
-        
-        this.context.font = this.font;
-        const scoreMetrics = this.context.measureText(`${this.displayScore}`);
+        const scoreMetrics = this.context.measureText(`Score: ${this.displayScore}`);
         const linesMetrics = this.context.measureText(`Lines: ${this.linesCleared}`);
         const levelMetrics = this.context.measureText(`Level: ${this.level}`);
         const comboMetrics = this.context.measureText(comboText);
         const b2bMetrics = this.context.measureText(b2bText);
         const maxWidth = Math.max(scoreMetrics.width, linesMetrics.width, levelMetrics.width, comboMetrics.width, b2bMetrics.width);
-        const lineHeight = 24;
-        
-        this.context.fillStyle = "black";
-        this.context.fillRect(this.x - 2, this.y - 20, maxWidth + 4, 120);
-        
+        this.context.clearRect(this.x, this.y - 20, this.x + maxWidth, this.y + 96);
         this.context.fillStyle = this.color;
         this.context.font = this.font;
         this.context.fillText(`${this.displayScore}`, this.x, this.y);
-        this.context.fillText(`Lines: ${this.linesCleared}`, this.x, this.y + lineHeight);
-        this.context.fillText(`Level: ${this.level}`, this.x, this.y + lineHeight * 2);
+        this.context.fillText(`Lines: ${this.linesCleared}`, this.x, this.y + 24);
+        this.context.fillText(`Level: ${this.level}`, this.x, this.y + 48);
         if (comboText) {
             this.context.fillStyle = "orange";
-            this.context.fillText(comboText, this.x, this.y + lineHeight * 3);
+            this.context.fillText(comboText, this.x, this.y + 72);
         }
         if (b2bText) {
             this.context.fillStyle = "cyan";
-            this.context.fillText(b2bText, this.x, this.y + lineHeight * 4);
+            this.context.fillText(b2bText, this.x, this.y + 96);
         }
     }
+
+
 
 }
 
@@ -657,10 +561,10 @@ function drawNextPiece() {
                 if (!cell) return;
                 context.fillStyle = tempPiece.color;
                 context.fillRect(
-                    Math.floor(startX + (j - minCol) * nextGrid.cellSize),
-                    Math.floor(startY + (i - minRow) * nextGrid.cellSize),
-                    Math.ceil(nextGrid.cellSize),
-                    Math.ceil(nextGrid.cellSize)
+                    startX + (j - minCol) * nextGrid.cellSize,
+                    startY + (i - minRow) * nextGrid.cellSize,
+                    nextGrid.cellSize,
+                    nextGrid.cellSize
                 );
             });
         });
@@ -695,24 +599,27 @@ function drawHeldPiece() {
                 if (!cell) return;
                 context.fillStyle = tempPiece.color;
                 context.fillRect(
-                    Math.floor(startX + (j - minCol) * holdGrid.cellSize),
-                    Math.floor(startY + (i - minRow) * holdGrid.cellSize),
-                    Math.ceil(holdGrid.cellSize),
-                    Math.ceil(holdGrid.cellSize)
+                    startX + (j - minCol) * holdGrid.cellSize,
+                    startY + (i - minRow) * holdGrid.cellSize,
+                    holdGrid.cellSize,
+                    holdGrid.cellSize
                 );
             });
         });
     }
 }
 
-let LastStepTime = Date.now();
+playField = new Grid(canvas.width / 2, canvas.height / 2 + 50, 20, 20, 10);
+scoreCounter = new Score(context, 10, playField.top + playField.height - 48);
+holdGrid = new Grid(canvas.width / 2 - 150, canvas.height / 2 - 100, 20, 4, 4);
+nextGrid = new Grid(canvas.width / 2 + 150, canvas.height / 2 - 100, 20, 4, 4);
+
+LastStepTime = Date.now();
 let bag = [];
 let heldPieceShape = null;
 let nextPieceShape = null;
 let canHold = true;
 let currentPiece = null;
-let initialsInput = "";
-let leaderboardData = [];
 
 let gameState = "menu";
 let menuSelection = 0;
@@ -720,21 +627,13 @@ const menuItems = ["Play", "Options", "Leaderboard"];
 let startLevel = 1;
 let showGhost = true;
 let optionSelection = 0;
-
-playField = new Grid(baseWidth / 2, baseHeight / 2 + 50, 20, 20, 10);
-scoreCounter = new Score(context, 10, playField.top + playField.height - 48);
-holdGrid = new Grid(baseWidth / 2 - 150, baseHeight / 2 - 100, 20, 4, 4);
-nextGrid = new Grid(baseWidth / 2 + 150, baseHeight / 2 - 100, 20, 4, 4);
-
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+let initialsInput = "";
+let leaderboardData = [];
+let leaderboardMessage = "";
 
 function startGame() {
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    
     context.fillStyle = "black";
-    context.fillRect(0, 0, scaledWidth, scaledHeight);
+    context.fillRect(0, 0, canvas.width, canvas.height);
     bag = [];
     heldPieceShape = null;
     nextPieceShape = null;
@@ -762,69 +661,63 @@ function startGame() {
 }
 
 function drawMenu() {
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    
     context.fillStyle = "black";
-    context.fillRect(0, 0, scaledWidth, scaledHeight);
+    context.fillRect(0, 0, canvas.width, canvas.height);
 
     context.textAlign = "center";
 
     context.font = "bold 48px Arial";
     context.fillStyle = "cyan";
-    context.fillText("TETRIS", scaledWidth / 2, scaledHeight / 2 - 80 * scale);
+    context.fillText("TETRIS", canvas.width / 2, canvas.height / 2 - 80);
 
     menuItems.forEach((item, i) => {
-        const y = scaledHeight / 2 - 10 * scale + i * 44 * scale;
+        const y = canvas.height / 2 - 10 + i * 44;
         const selected = i === menuSelection;
         context.font = selected ? "bold 24px Arial" : "22px Arial";
         context.fillStyle = selected ? "white" : "#888";
         if (selected) {
-            context.fillText("> " + item + " <", scaledWidth / 2, y);
+            context.fillText("> " + item + " <", canvas.width / 2, y);
         } else {
-            context.fillText(item, scaledWidth / 2, y);
+            context.fillText(item, canvas.width / 2, y);
         }
     });
 
     context.font = "13px Arial";
     context.fillStyle = "#555";
-    context.fillText("Up / Down to select   Enter to confirm", scaledWidth / 2, scaledHeight / 2 + 130 * scale);
+    context.fillText("Up / Down to select   Enter to confirm", canvas.width / 2, canvas.height / 2 + 130);
 
     context.textAlign = "left";
 }
 
 function drawOptions() {
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    
     context.fillStyle = "black";
-    context.fillRect(0, 0, scaledWidth, scaledHeight);
+    context.fillRect(0, 0, canvas.width, canvas.height);
 
     context.textAlign = "center";
 
     context.font = "bold 32px Arial";
     context.fillStyle = "cyan";
-    context.fillText("OPTIONS", scaledWidth / 2, scaledHeight / 2 - 120 * scale);
+    context.fillText("OPTIONS", canvas.width / 2, canvas.height / 2 - 120);
 
     const levelSelected = optionSelection === 0;
     context.font = "20px Arial";
     context.fillStyle = levelSelected ? "white" : "#888";
-    context.fillText("Start Level", scaledWidth / 2, scaledHeight / 2 - 40 * scale);
+    context.fillText("Start Level", canvas.width / 2, canvas.height / 2 - 40);
     context.font = levelSelected ? "bold 28px Arial" : "24px Arial";
     context.fillStyle = levelSelected ? "yellow" : "#888";
-    context.fillText("< " + startLevel + " >", scaledWidth / 2, scaledHeight / 2);
+    context.fillText("< " + startLevel + " >", canvas.width / 2, canvas.height / 2);
 
     const ghostSelected = optionSelection === 1;
     context.font = "20px Arial";
     context.fillStyle = ghostSelected ? "white" : "#888";
-    context.fillText("Ghost Piece", scaledWidth / 2, scaledHeight / 2 + 55 * scale);
+    context.fillText("Ghost Piece", canvas.width / 2, canvas.height / 2 + 55);
     context.font = ghostSelected ? "bold 28px Arial" : "24px Arial";
     context.fillStyle = ghostSelected ? "yellow" : "#888";
-    context.fillText(showGhost ? "ON" : "OFF", scaledWidth / 2, scaledHeight / 2 + 90 * scale);
+    context.fillText(showGhost ? "ON" : "OFF", canvas.width / 2, canvas.height / 2 + 90);
 
     context.font = "13px Arial";
     context.fillStyle = "#555";
-    context.fillText("Up / Down to select   Left / Right to change   Escape to go back", scaledWidth / 2, scaledHeight / 2 + 150 * scale);
+    context.fillText("Up / Down to select   Left / Right to change   Escape to go back", canvas.width / 2, canvas.height / 2 + 150);
 
     context.textAlign = "left";
 }
@@ -842,30 +735,29 @@ function loop() {
 }
 
 function gameOver() {
-    const scaledWidth = baseWidth * scale;
-    const scaledHeight = baseHeight * scale;
-    
     playField.drawCells();
     initialsInput = "";
+    leaderboardMessage = "";
     gameState = "initials";
 }
 
 function drawInitialsInput() {
+    playField.drawCells();
     context.fillStyle = "rgba(0, 0, 0, 0.75)";
     context.fillRect(playField.left, playField.top, playField.width, playField.height);
     context.textAlign = "center";
     context.fillStyle = "white";
     context.font = "bold 28px Arial";
-    context.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 70);
+    context.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 68);
     context.font = "20px Arial";
-    context.fillStyle = "#aaa";
-    context.fillText("Enter your initials:", canvas.width / 2, canvas.height / 2 - 25);
+    context.fillStyle = "#bdbdbd";
+    context.fillText("Enter your initials", canvas.width / 2, canvas.height / 2 - 24);
     context.font = "bold 36px Arial";
-    context.fillStyle = "yellow";
-    context.fillText(initialsInput + (initialsInput.length < 3 ? "_" : ""), canvas.width / 2, canvas.height / 2 + 20);
+    context.fillStyle = "#ffe16d";
+    context.fillText(`${initialsInput}${initialsInput.length < 3 ? "_" : ""}`, canvas.width / 2, canvas.height / 2 + 20);
     context.font = "14px Arial";
-    context.fillStyle = "#666";
-    context.fillText("Enter to submit  |  Escape to skip", canvas.width / 2, canvas.height / 2 + 58);
+    context.fillStyle = "#9a9a9a";
+    context.fillText("Enter to submit, Escape to skip", canvas.width / 2, canvas.height / 2 + 56);
     context.textAlign = "left";
 }
 
@@ -873,48 +765,66 @@ function drawLeaderboard() {
     context.fillStyle = "black";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.textAlign = "center";
-    context.font = "bold 32px Arial";
     context.fillStyle = "cyan";
-    context.fillText("LEADERBOARD", canvas.width / 2, 80);
-    if (leaderboardData.length === 0) {
+    context.font = "bold 32px Arial";
+    context.fillText("LEADERBOARD", canvas.width / 2, 84);
+
+    if (leaderboardMessage) {
+        context.font = "16px Arial";
+        context.fillStyle = "#ffaa55";
+        context.fillText(leaderboardMessage, canvas.width / 2, 118);
+    }
+
+    if (!leaderboardData.length) {
         context.font = "18px Arial";
-        context.fillStyle = "#666";
+        context.fillStyle = "#888";
         context.fillText("No scores yet", canvas.width / 2, canvas.height / 2);
     } else {
         leaderboardData.forEach((entry, i) => {
-            const y = 130 + i * 36;
+            const y = 154 + i * 32;
             context.font = i < 3 ? "bold 18px Arial" : "16px Arial";
             context.fillStyle = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "#cd7f32" : "white";
-            context.fillText(`${i + 1}.  ${entry.initials}  ${entry.score}`, canvas.width / 2, y);
+            context.fillText(`${i + 1}. ${entry.name} ${entry.score}`, canvas.width / 2, y);
         });
     }
+
     context.font = "13px Arial";
-    context.fillStyle = "#555";
-    context.fillText("Enter or Escape to return to menu", canvas.width / 2, canvas.height - 40);
+    context.fillStyle = "#666";
+    context.fillText("Enter or Escape to return to menu", canvas.width / 2, canvas.height - 36);
     context.textAlign = "left";
 }
 
 async function fetchLeaderboard() {
+    leaderboardMessage = "";
     try {
-        const res = await fetch("/api/leaderboard");
-        leaderboardData = await res.json();
+        const response = await fetch(`${LEADERBOARD_ENDPOINT}?limit=10`);
+        const payload = await response.json();
+        leaderboardData = Array.isArray(payload.leaderboard) ? payload.leaderboard : [];
     } catch {
         leaderboardData = [];
+        leaderboardMessage = "Could not load leaderboard";
     }
     gameState = "leaderboard";
 }
 
-async function submitScore(initials, score) {
+async function submitScore(name, score) {
+    leaderboardMessage = "";
     try {
-        const res = await fetch("/api/leaderboard", {
+        const response = await fetch(LEADERBOARD_ENDPOINT, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initials, score })
+            body: JSON.stringify({ name, score })
         });
-        const data = await res.json();
-        leaderboardData = data.leaderboard || [];
+        const payload = await response.json();
+        if (!response.ok) {
+            leaderboardData = [];
+            leaderboardMessage = payload.error || "Could not submit score";
+        } else {
+            leaderboardData = Array.isArray(payload.leaderboard) ? payload.leaderboard : [];
+        }
     } catch {
         leaderboardData = [];
+        leaderboardMessage = "Could not submit score";
     }
     gameState = "leaderboard";
 }
@@ -1008,10 +918,22 @@ document.addEventListener("keydown", (key) => {
     }
 
     if (gameState === "initials") {
-        if (key.key === "Escape") { fetchLeaderboard(); return; }
-        if (key.key === "Enter" && initialsInput.length > 0) { submitScore(initialsInput, scoreCounter.score); return; }
-        if (key.key === "Backspace") { initialsInput = initialsInput.slice(0, -1); return; }
-        if (/^[a-zA-Z]$/.test(key.key) && initialsInput.length < 3) { initialsInput += key.key.toUpperCase(); return; }
+        if (key.key === "Escape") {
+            fetchLeaderboard();
+            return;
+        }
+        if (key.key === "Backspace") {
+            initialsInput = initialsInput.slice(0, -1);
+            return;
+        }
+        if (key.key === "Enter" && initialsInput.length > 0) {
+            submitScore(initialsInput, scoreCounter.score);
+            return;
+        }
+        if (/^[a-zA-Z]$/.test(key.key) && initialsInput.length < 3) {
+            initialsInput += key.key.toUpperCase();
+            return;
+        }
         return;
     }
 
@@ -1033,18 +955,15 @@ document.addEventListener("keydown", (key) => {
     if (gameState !== "playing") return;
 
     if (key.key === "Escape") {
-        const scaledWidth = baseWidth * scale;
-        const scaledHeight = baseHeight * scale;
-        
         gameState = "paused";
         context.fillStyle = "rgba(0, 0, 0, 0.6)";
         context.fillRect(playField.left, playField.top, playField.width, playField.height);
         context.fillStyle = "white";
         context.font = "bold 28px Arial";
         context.textAlign = "center";
-        context.fillText("PAUSED", scaledWidth / 2, scaledHeight / 2);
+        context.fillText("PAUSED", canvas.width / 2, canvas.height / 2);
         context.font = "16px Arial";
-        context.fillText("Press Escape to resume", scaledWidth / 2, scaledHeight / 2 + 32 * scale);
+        context.fillText("Press Escape to resume", canvas.width / 2, canvas.height / 2 + 32);
         context.textAlign = "left";
         return;
     }
