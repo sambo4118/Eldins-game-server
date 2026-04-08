@@ -617,10 +617,12 @@ let heldPieceShape = null;
 let nextPieceShape = null;
 let canHold = true;
 let currentPiece = null;
+let initialsInput = "";
+let leaderboardData = [];
 
 let gameState = "menu";
 let menuSelection = 0;
-const menuItems = ["Play", "Options"];
+const menuItems = ["Play", "Options", "Leaderboard"];
 let startLevel = 1;
 let showGhost = true;
 let optionSelection = 0;
@@ -722,22 +724,85 @@ function loop() {
     if (gameState === "menu") drawMenu();
     else if (gameState === "options") drawOptions();
     else if (gameState === "playing") gameLoop();
-    // "paused" and "gameover" states: do nothing, overlay already drawn
+    else if (gameState === "initials") drawInitialsInput();
+    else if (gameState === "leaderboard") drawLeaderboard();
+    // "paused" state: do nothing, overlay already drawn
     requestAnimationFrame(loop);
 }
 
 function gameOver() {
     playField.drawCells();
-    context.fillStyle = "rgba(0, 0, 0, 0.6)";
+    initialsInput = "";
+    gameState = "initials";
+}
+
+function drawInitialsInput() {
+    context.fillStyle = "rgba(0, 0, 0, 0.75)";
     context.fillRect(playField.left, playField.top, playField.width, playField.height);
+    context.textAlign = "center";
     context.fillStyle = "white";
     context.font = "bold 28px Arial";
-    context.textAlign = "center";
-    context.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
-    context.font = "16px Arial";
-    context.fillText("Press Enter to play again", canvas.width / 2, canvas.height / 2 + 32);
+    context.fillText("GAME OVER", canvas.width / 2, canvas.height / 2 - 70);
+    context.font = "20px Arial";
+    context.fillStyle = "#aaa";
+    context.fillText("Enter your initials:", canvas.width / 2, canvas.height / 2 - 25);
+    context.font = "bold 36px Arial";
+    context.fillStyle = "yellow";
+    context.fillText(initialsInput + (initialsInput.length < 3 ? "_" : ""), canvas.width / 2, canvas.height / 2 + 20);
+    context.font = "14px Arial";
+    context.fillStyle = "#666";
+    context.fillText("Enter to submit  |  Escape to skip", canvas.width / 2, canvas.height / 2 + 58);
     context.textAlign = "left";
-    gameState = "gameover";
+}
+
+function drawLeaderboard() {
+    context.fillStyle = "black";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.textAlign = "center";
+    context.font = "bold 32px Arial";
+    context.fillStyle = "cyan";
+    context.fillText("LEADERBOARD", canvas.width / 2, 80);
+    if (leaderboardData.length === 0) {
+        context.font = "18px Arial";
+        context.fillStyle = "#666";
+        context.fillText("No scores yet", canvas.width / 2, canvas.height / 2);
+    } else {
+        leaderboardData.forEach((entry, i) => {
+            const y = 130 + i * 36;
+            context.font = i < 3 ? "bold 18px Arial" : "16px Arial";
+            context.fillStyle = i === 0 ? "gold" : i === 1 ? "silver" : i === 2 ? "#cd7f32" : "white";
+            context.fillText(`${i + 1}.  ${entry.initials}  ${entry.score}`, canvas.width / 2, y);
+        });
+    }
+    context.font = "13px Arial";
+    context.fillStyle = "#555";
+    context.fillText("Enter or Escape to return to menu", canvas.width / 2, canvas.height - 40);
+    context.textAlign = "left";
+}
+
+async function fetchLeaderboard() {
+    try {
+        const res = await fetch("/api/leaderboard");
+        leaderboardData = await res.json();
+    } catch {
+        leaderboardData = [];
+    }
+    gameState = "leaderboard";
+}
+
+async function submitScore(initials, score) {
+    try {
+        const res = await fetch("/api/leaderboard", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initials, score })
+        });
+        const data = await res.json();
+        leaderboardData = data.leaderboard || [];
+    } catch {
+        leaderboardData = [];
+    }
+    gameState = "leaderboard";
 }
 
 function gameLoop() {
@@ -808,6 +873,7 @@ document.addEventListener("keydown", (key) => {
         } else if (key.key === "Enter") {
             if (menuSelection === 0) startGame();
             else if (menuSelection === 1) gameState = "options";
+            else if (menuSelection === 2) fetchLeaderboard();
         }
         return;
     }
@@ -827,8 +893,16 @@ document.addEventListener("keydown", (key) => {
         return;
     }
 
-    if (gameState === "gameover") {
-        if (key.key === "Enter") startGame();
+    if (gameState === "initials") {
+        if (key.key === "Escape") { fetchLeaderboard(); return; }
+        if (key.key === "Enter" && initialsInput.length > 0) { submitScore(initialsInput, scoreCounter.score); return; }
+        if (key.key === "Backspace") { initialsInput = initialsInput.slice(0, -1); return; }
+        if (/^[a-zA-Z]$/.test(key.key) && initialsInput.length < 3) { initialsInput += key.key.toUpperCase(); return; }
+        return;
+    }
+
+    if (gameState === "leaderboard") {
+        if (key.key === "Enter" || key.key === "Escape") gameState = "menu";
         return;
     }
 
