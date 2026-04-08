@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Eldin's Game Server</title>
+        <style>
+            :root {
+                color-scheme: dark;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                color: #e8e8e8;
+                background: radial-gradient(circle at 20% 20%, #2a2f3a 0%, #171a21 45%, #0e1015 100%);
+                display: grid;
+                place-items: center;
+                padding: 2rem 1rem;
+            }
+
+            main {
+                width: min(900px, 100%);
+                background: #1f2530;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 20px;
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+                padding: clamp(1.5rem, 3vw, 2.5rem);
+            }
+
+            h1 {
+                margin: 0 0 0.5rem;
+                font-size: clamp(1.9rem, 3.4vw, 2.8rem);
+                color: #ffffff;
+            }
+
+            p {
+                margin: 0 0 1.5rem;
+                max-width: 58ch;
+                line-height: 1.5;
+                color: #b8c0cc;
+            }
+
+            .game-links {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: grid;
+                gap: 1rem;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
+
+            .game-link {
+                position: relative;
+                display: block;
+                aspect-ratio: 1 / 1;
+                text-decoration: none;
+                color: #e8e8e8;
+                border-radius: 14px;
+                overflow: hidden;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35);
+                transition: transform 160ms ease, box-shadow 160ms ease;
+                isolation: isolate;
+            }
+
+            .game-link::before,
+            .game-link::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+            }
+
+            .game-link::before {
+                background: var(--tile-image);
+                background-position: center;
+                background-size: cover;
+            }
+
+            .game-link::after {
+                background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent 50%);
+            }
+
+            .game-link:hover,
+            .game-link:focus-visible {
+                transform: translateY(-3px);
+                box-shadow: 0 14px 28px rgba(0, 0, 0, 0.5);
+            }
+
+            .game-link:focus-visible {
+                outline: 3px solid #5a8ec9;
+                outline-offset: 2px;
+            }
+
+            .game-link-content {
+                position: relative;
+                z-index: 1;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
+                padding: 1rem;
+                background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.2) 50%, transparent 72%);
+            }
+
+            .game-title {
+                display: block;
+                font-size: 1.15rem;
+                font-weight: 700;
+                letter-spacing: 0.02em;
+                margin-bottom: 0.2rem;
+                color: #ffffff;
+            }
+
+            .game-path {
+                opacity: 0.85;
+                font-size: 0.9rem;
+                color: #b8c0cc;
+            }
+
+            .tile-tetris {
+                --tile-image: linear-gradient(150deg, #566f9f 0%, #314a6f 45%, #1f2530 100%);
+            }
+
+            .tile-2048 {
+                --tile-image: linear-gradient(155deg, #d4a259 0%, #a86b3a 55%, #6d4428 100%);
+            }
+
+            .version {
+                position: fixed;
+                bottom: 1rem;
+                right: 1rem;
+                font-size: 0.85rem;
+                color: rgba(255, 255, 255, 0.4);
+                font-family: "Consolas", "Courier New", monospace;
+                user-select: none;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>Eldin's Games</h1>
+            <p>
+                You got games on your phone?
+            </p>
+            <ul class="game-links">
+                <li>
+                    <a class="game-link tile-tetris" href="/tetris-online">
+                        <span class="game-link-content">
+                            <span class="game-title">Tetris Online</span>
+                        </span>
+                    </a>
+                </li>
+                <li>
+                    <a class="game-link tile-2048" href="/2048-remade">
+                        <span class="game-link-content">
+                            <span class="game-title">2048 Remade</span>
+                        </span>
+                    </a>
+                </li>
+            </ul>
+        </main>
+        <div class="version">v1.0.0</div>
+    </body>
+</html>
+        
