@@ -106,8 +106,13 @@ fs.readdirSync(GAMES_DIR).forEach((name) => {
     const indexFile = fs.existsSync(path.join(gamePath, 'index.html'))
         ? 'index.html'
         : 'frontend.html';
+    const indexPath = path.join(gamePath, indexFile);
 
-    app.use(`/${name}`, express.static(gamePath, { index: indexFile }));
+    app.get([`/${name}`, `/${name}/`], (req, res) => {
+        res.sendFile(indexPath);
+    });
+
+    app.use(`/${name}`, express.static(gamePath, { index: false }));
     console.log(`Registered: http://localhost:${PORT}/${name}`);
 });
 

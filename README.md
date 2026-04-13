@@ -46,6 +46,23 @@ Validation rules:
 
 Scores are persisted in `data/scoreboards/:gameId.json`.
 
+## Deploying With Git Submodules
+
+This repository pins `games/tetris-online` and `games/2048-remade` as submodules.
+
+If an updater runs `git pull` inside a submodule, the parent repository becomes dirty because the submodule commit no longer matches the commit recorded by the parent repo.
+
+For automated updates, use this flow from the repository root:
+
+```bash
+git pull
+npm run sync:submodules
+```
+
+That keeps the direct submodules aligned to the exact commits recorded by the parent repository.
+
+Do not run `git pull` directly inside `games/tetris-online` unless you also intend to commit the updated submodule pointer in the parent repository.
+
 ## Add scoreboard to a new game
 
 1. Pick a stable `gameId` (usually the folder name).

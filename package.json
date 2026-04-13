@@ -15,6 +15,7 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
+    "sync:submodules": "bash scripts/sync-submodules.sh",
     "test": "node --test",
     "start": "node server.js"
   },
